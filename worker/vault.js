@@ -17,7 +17,7 @@ export async function openSecret(record,env){
 }
 export async function projectSecrets(db,env,projectId,userId){
   const rows=(await db.prepare('SELECT c.* FROM api_credentials c JOIN projects p ON p.id=c.project_id WHERE c.project_id=? AND c.user_id=? AND p.user_id=?').bind(projectId,userId,userId).all()).results;
-  const known=env.OPENAI_API_KEY?[env.OPENAI_API_KEY]:[];
+  const known=[env.OPENAI_API_KEY,...(env.PLATFORM_SECRETS||[])].filter(Boolean);
   for(const row of rows)known.push(await openSecret(row,env));
   return known;
 }

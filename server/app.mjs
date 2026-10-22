@@ -3,6 +3,8 @@ import {Readable} from 'node:stream';
 import {randomBytes,createHash,timingSafeEqual} from 'node:crypto';
 import {SessionDatabases} from './database.mjs';
 import worker from '../dist/server/index.js';
+import {compilePreview,checkProject} from './project-compiler.mjs';
+import {ProjectSandboxPool} from './project-sandbox.mjs';
 
 const hash=value=>createHash('sha256').update(value).digest();
 const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
@@ -14,6 +16,7 @@ export function createApplication({origin,accessPassword,openaiKey='',openaiMode
   if(!['http:','https:'].includes(publicUrl.protocol)||publicUrl.pathname!=='/'||publicUrl.search||publicUrl.hash||publicUrl.username||publicUrl.password)throw new Error('PUBLIC_ORIGIN precisa conter somente a origem do site.');
   if(publicUrl.protocol!=='https:'&&!['localhost','127.0.0.1','[::1]'].includes(publicUrl.hostname))throw new Error('Use HTTPS fora do ambiente local.');
   if(typeof accessPassword!=='string'||accessPassword.length<20||accessPassword.length>256)throw new Error('Configure ACCESS_PASSWORD com 20 a 256 caracteres.');
+  const sandboxes=new ProjectSandboxPool();
   const expected=hash('devstudio:'+accessPassword),master=randomBytes(32).toString('hex');
   let active=0;const counters=new Map();
   function basic(request){
@@ -37,7 +40,7 @@ export function createApplication({origin,accessPassword,openaiKey='',openaiMode
       if(isApi&&!['GET','POST','PUT','PATCH','DELETE'].includes(request.method))return reply(response,405,'Método não permitido.');
       const headers=new Headers();
       for(const [key,value]of Object.entries(request.headers))if(value!==undefined&&!['authorization','cookie','host','connection','transfer-encoding','content-length'].includes(key))headers.set(key,Array.isArray(value)?value.join(', '):value);
-      const env={OPENAI_API_KEY:openaiKey,OPENAI_MODEL:openaiModel,CREDENTIALS_ENCRYPTION_KEY:master,TEMPORARY_DATA:true};
+      const env={OPENAI_API_KEY:openaiKey,OPENAI_MODEL:openaiModel,CREDENTIALS_ENCRYPTION_KEY:master,TEMPORARY_DATA:true,COMPILE_PREVIEW:compilePreview,CHECK_PROJECT:checkProject,ALLOW_REPAIR:()=>permit('ai-minute',10,60000)&&permit('ai-day',300,86400000)};
       if(isApi){
         if(request.method!=='GET'&&request.headers.origin!==publicUrl.origin)return reply(response,403,'Origem não permitida.');
         const id=request.headers['x-dev-studio-session'];
@@ -48,7 +51,10 @@ export function createApplication({origin,accessPassword,openaiKey='',openaiMode
         if(Number(request.headers['content-length'])>maxBody)return reply(response,413,'O corpo da solicitação excede o limite.');
         let acquired;try{acquired=databases.acquire(id);}catch{return reply(response,503,'Limite de sessões temporárias atingido. Aguarde uma sessão expirar.');}
         session=acquired.session;release=acquired.release;active++;
-        env.DB=session.db;env.REQUEST_SIGNAL=AbortSignal.any([abort.signal,session.abort.signal]);
+        env.DB=session.db;
+        session.closeRuntime=()=>sandboxes.closeSession(id);
+        env.PROJECT_RUNTIME={info:()=>({configured:true,mode:'embedded',temporary:true}),prepare:args=>sandboxes.prepare(id,args),execute:args=>sandboxes.execute(id,args),status:args=>sandboxes.status(id,args),close:projectId=>sandboxes.closeProject(id,projectId)};
+        env.REQUEST_SIGNAL=AbortSignal.any([abort.signal,session.abort.signal]);
         const scopedCookie=baseCookie+'_'+hash(id).toString('hex').slice(0,16);
         const incoming=(request.headers.cookie||'').split(';').map(value=>value.trim()).find(value=>value.startsWith(scopedCookie+'='));
         if(incoming)headers.set('cookie',baseCookie+'='+incoming.slice(scopedCookie.length+1));
@@ -76,6 +82,6 @@ export function createApplication({origin,accessPassword,openaiKey='',openaiMode
     }finally{if(release){active--;release();}}
   });
   server.requestTimeout=120000;server.headersTimeout=15000;
-  server.on('close',()=>{clearInterval(sweep);databases.close();});
-  return{server,databases};
+  server.on('close',()=>{clearInterval(sweep);databases.close();sandboxes.close();});
+  return{server,databases,sandboxes};
 }

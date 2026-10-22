@@ -37,6 +37,6 @@ export class SessionDatabases{
     session.active++;session.lastSeen=this.clock();
     return{session,release:()=>{session.active--;if(session.ended&&session.active===0)session.db.close();}};
   }
-  end(id){const session=this.sessions.get(id);if(!session)return;this.sessions.delete(id);session.ended=true;session.abort.abort();if(session.active===0)session.db.close();}
+  end(id){const session=this.sessions.get(id);if(!session)return;this.sessions.delete(id);session.ended=true;session.abort.abort();session.closeRuntime?.();if(session.active===0)session.db.close();}
   close(){for(const id of this.sessions.keys())this.end(id);}
 }

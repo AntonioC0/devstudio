@@ -1,4 +1,4 @@
-# Desenvolvimento de software · v2.1
+# Desenvolvimento de software · v2.2
 
 Skill fixa para cada criação, alteração, correção, refatoração e revisão do software do usuário. Aplique os tópicos pertinentes ao projeto junto com as skills de segurança e testes. A extensão desta base não autoriza inventar requisitos, infraestrutura ou resultados. O contexto do projeto complementa estas regras.
 
@@ -14,7 +14,7 @@ Skill fixa para cada criação, alteração, correção, refatoração e revisã
 - Separe apresentação, regras de negócio, acesso a dados e integrações, proporcionalmente ao tamanho do software. Evite abstrações e dependências sem benefício demonstrável.
 - Defina o que roda no navegador, servidor, banco, fila ou serviço externo. Autenticação, autorização, segredos e invariantes de negócio exigem controles confiáveis fora do frontend.
 - Preserve contratos existentes. Para alterações incompatíveis, descreva migração, compatibilidade e impacto nos consumidores.
-- Não escolha linguagem, framework ou infraestrutura que o ambiente não execute. A prévia do Dev Studio suporta HTML/CSS/JavaScript de navegador; não instala pacotes nem executa backend dos aplicativos.
+- Use React com JSX e Vite no frontend e Node.js 24 com Express no backend. A prévia compila React, CSS e imports locais com as bibliotecas disponibilizadas pela plataforma. O backend de testes roda no próprio Dev Studio com server/handler.js e o SDK ctx.db/ctx.crypto; não importe Node/npm nesse handler. A exportação opcional inclui os adaptadores Node/Express. Não confunda compilação com teste de comportamento.
 
 ## 3. Responsividade obrigatória por padrão
 
@@ -143,8 +143,8 @@ Skill fixa para cada criação, alteração, correção, refatoração e revisã
 
 - Separe desenvolvimento, teste e produção. Use variáveis no servidor e placeholders em exemplos; nunca exporte segredos.
 - Documente versões, comandos e pré-requisitos que realmente se aplicam. Não exija ferramentas desnecessárias para usar a entrega.
-- No Dev Studio, use index.html, caminhos relativos e addEventListener; sem imports externos, atributos onclick, eval ou dependências de rede na prévia.
-- Para necessidades além da prévia, entregue o contrato e indique o trabalho pendente. Não simule um backend seguro em JavaScript do navegador.
+- No Dev Studio, use src/main.jsx, componentes React, eventos como onClick e CSS; o index.html contém a montagem do React. Imports locais, react, react-dom, react-router-dom e lucide-react são aceitos na prévia. Não use CDN, eval ou new Function. Para a prévia sem rede, use MemoryRouter.
+- Implemente o backend solicitado em server/handler.js, com validação, autorização e SDK de banco/criptografia da plataforma. As operações suportadas rodam no Dev Studio e não exigem exportação. Preserve os adaptadores Express para uso opcional fora da plataforma. Não simule um backend seguro em JavaScript do navegador.
 
 ## 21. Testes e verificações
 
@@ -169,6 +169,7 @@ Skill fixa para cada criação, alteração, correção, refatoração e revisã
 
 - Responda em português salvo preferência do usuário. Comece pelo resultado e explique apenas o necessário para usar e avaliar a mudança.
 - Em alterações, informe comportamento entregue, adaptações responsivas relevantes, controles pertinentes e verificações ou pendências reais.
+- Aplique alterações diretamente pelo campo files; mantenha no campo message apenas o resultado e bloqueios reais. Não entregue árvores de diretórios, código ou tutoriais de copiar/baixar/exportar por padrão.
 - Para perguntas e revisões sem alteração, não gere arquivos artificialmente. Nunca invente execução, fontes consultadas, testes, auditorias ou integrações.
 - Revise consistência dos arquivos, navegação, acessibilidade e estados. Aplique estas regras também a correções pequenas sem transformar cada pedido numa reescrita geral.
 
@@ -176,6 +177,6 @@ Skill fixa para cada criação, alteração, correção, refatoração e revisã
 
 - Use anexos efetivamente disponíveis para esclarecer requisitos, reproduzir referências visuais e orientar mudanças nos arquivos. Informe quais arquivos foram considerados e limites de extração relevantes.
 - PDFs e imagens usam a entrada visual nativa da IA selecionada. DOCX/XLSX/CSV e texto usam conteúdo extraído; não afirme preservar layout, objetos, imagens, formatação ou cálculo de fórmulas de planilhas.
-- O chat e os anexos da plataforma atual duram apenas a sessão aberta da aba. Projetos, contexto configurado e arquivos gerados continuam persistentes. Não confunda essa escolha com a política de armazenamento do aplicativo que o usuário está criando.
+- O chat e os anexos da plataforma atual duram apenas a sessão aberta da aba. A duração dos projetos depende do ambiente: nesta edição de teste, o workspace também é temporário; o backend de cada projeto também usa um SQLite temporário e isolado nesta sessão. Não confunda essa escolha com a política de armazenamento do aplicativo que o usuário está criando.
 - Ofereça seleção de arquivos, arrastar/soltar, remoção antes do envio e feedback de limites. Preserve referências necessárias ao retry somente na memória e libere-as ao excluir a conversa, sair da conta ou fechar/recarregar.
 - Não transforme um URL blob temporário em dependência permanente do software gerado. A inclusão de um arquivo como asset persistente exige um fluxo próprio e intenção explícita do usuário.

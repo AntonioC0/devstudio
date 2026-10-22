@@ -1,5 +1,12 @@
-export function previewDocument(files){
+import {BACKEND_BRIDGE_SOURCE} from './backend-bridge.js';
+export function previewDocument(files,compiled){
   const nonce=document.querySelector('meta[name="csp-nonce"]')?.content||'';
+  if(compiled?.kind==='react'){
+    const policy=`default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'`;
+    const css=compiled.css.replace(/<\/style/gi,'<\\/style'),script=compiled.javascript.replace(/<\/script/gi,'<\\/script');
+    return `<!doctype html><html lang="pt-BR"><head><meta http-equiv="Content-Security-Policy" content="${policy}"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Prévia React</title><style>${css}</style></head><body><div id="root"></div><script nonce="${nonce}">${BACKEND_BRIDGE_SOURCE.replace('__CHANNEL__',crypto.randomUUID())}window.addEventListener('error',function(event){const root=document.getElementById('root');root.replaceChildren();const text=document.createElement('pre');text.style.cssText='padding:24px;white-space:pre-wrap;color:#8a2a25;font:14px system-ui';text.textContent='A interface encontrou um erro: '+event.message;root.appendChild(text);});</script><script nonce="${nonce}">${script}</script></body></html>`;
+  }
+  if(files.some(file=>/^src\/.*\.[jt]sx$/.test(file.path)))return '<!doctype html><html lang="pt-BR"><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="font:14px system-ui;padding:32px;color:#61705e">Preparando a prévia React…</body></html>';
   const map=new Map(files.map(f=>[f.path,f.content]));
   let html=map.get('index.html')||'<!doctype html><html><body><p>Crie um arquivo index.html para visualizar seu projeto.</p></body></html>';
   const doc=new DOMParser().parseFromString(html,'text/html');

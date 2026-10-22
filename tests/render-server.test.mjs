@@ -75,3 +75,40 @@ test('SQLite batches preserve atomicity and do not interleave transactions',asyn
     assert.equal(db.native.prepare('SELECT COUNT(*) AS n FROM users').get().n,2);
   }finally{db.close();}
 });
+
+test('authenticated project preview and embedded API work over HTTP and cannot cross tabs',async t=>{
+  const {request,sandboxes}=await running(t),tab=crypto.randomUUID(),other=crypto.randomUUID();
+  async function register(id,email){const response=await request('/api/auth/register',{method:'POST',tab:id,data:{name:'React Tester',email,password:'React-test-password-123'}});assert.equal(response.status,201);return response.headers.get('set-cookie').split(';')[0];}
+  const cookie=await register(tab,'react@example.test'),otherCookie=await register(other,'other@example.test');
+  const created=await request('/api/projects',{method:'POST',tab,cookie,data:{name:'React integrado'}});const project=(await created.json()).project;
+  const endpoint='/api/projects/'+project.id;
+  const preview=await request(endpoint+'/preview',{method:'POST',tab,cookie,data:{version:project.version}});assert.equal(preview.status,200);assert.equal((await preview.json()).preview.kind,'react');
+  const started=await request(endpoint+'/run',{method:'POST',tab,cookie,data:{version:project.version}});assert.equal(started.status,200);assert.equal((await started.json()).runtime.mode,'embedded');
+  const api=await request(endpoint+'/runtime-request',{method:'POST',tab,cookie,data:{version:project.version,request:{method:'GET',url:'/api/health'}}});assert.equal(api.status,200);assert.equal((await api.json()).response.body.status,'ok');
+  assert.equal((await request(endpoint+'/runtime-request',{method:'POST',tab:other,cookie:otherCookie,data:{version:0,request:{method:'GET',url:'/api/health'}}})).status,404);
+  assert.equal((await request(endpoint+'/preview',{method:'POST',tab,cookie,data:{version:999}})).status,409);
+  const config=await (await request('/api/config',{tab,cookie})).json();assert.deepEqual(config.runtime,{configured:true,mode:'embedded',temporary:true});
+  assert.equal(sandboxes.slots.size,1);
+  await request('/api/test-session',{method:'DELETE',tab,cookie});assert.equal(sandboxes.slots.size,0);
+});
+
+test('chat generation applies React and handler files then serves their real backend inside the same application',async t=>{
+  const {request}=await running(t,{openaiKey:'synthetic-chat-provider-credential'}),tab=crypto.randomUUID();
+  const registered=await request('/api/auth/register',{method:'POST',tab,data:{name:'Chat Tester',email:'chat-runtime@example.test',password:'Chat-test-password-123'}});
+  const cookie=registered.headers.get('set-cookie').split(';')[0];
+  const created=await request('/api/projects',{method:'POST',tab,cookie,data:{name:'Tarefas pelo chat'}});const initial=(await created.json()).project;
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=async(url,options)=>{
+    if(url!=='https://api.openai.com/v1/responses')return originalFetch(url,options);
+    const body=JSON.parse(options.body);assert.match(body.instructions,/Não coloque nele árvores de pastas/);assert.match(body.instructions,/ctx.db.insert/);
+    const update={message:'Seu gerenciador de tarefas está pronto para testar aqui.',files:[{path:'src/App.jsx',content:"import React from 'react';export default function App(){return <h1>Minhas tarefas</h1>}"},{path:'server/handler.js',content:"export default function handler(req,ctx){if(req.method==='POST')return{status:201,body:ctx.db.insert('tasks',{title:req.body.title})};return{status:200,body:ctx.db.list('tasks')};}"}]};
+    return Response.json({status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(update)}]}]});
+  };
+  try{
+    const response=await request('/api/projects/'+initial.id+'/generate-session',{method:'POST',tab,cookie,data:{content:'Crie meu gerenciador de tarefas.',request_id:crypto.randomUUID(),history:[]}});
+    const generated=await response.json();assert.equal(response.status,200,generated.detail);assert.equal(generated.changed.length,2);assert.ok(generated.validation.checks.length>0);assert.match(generated.reply,/pronto para testar aqui/);
+    const run=(method,body)=>request('/api/projects/'+initial.id+'/runtime-request',{method:'POST',tab,cookie,data:{version:generated.project.version,request:{method,url:'/api/tasks',body}}});
+    assert.equal((await (await run('POST',{title:'Criado no backend'})).json()).response.status,201);
+    assert.equal((await (await run('GET')).json()).response.body[0].title,'Criado no backend');
+  }finally{globalThis.fetch=originalFetch;}
+});
