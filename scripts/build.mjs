@@ -1,0 +1,14 @@
+import {build} from 'esbuild';
+import {mkdir,readFile,writeFile,cp,rm} from 'node:fs/promises';
+const root=new URL('../',import.meta.url);
+process.chdir(root.pathname);
+await rm('.build',{recursive:true,force:true});await mkdir('.build',{recursive:true});
+await build({entryPoints:['client/main.jsx'],bundle:true,minify:true,format:'iife',target:'es2022',outfile:'.build/app.js',define:{'process.env.NODE_ENV':'"production"'}});
+const html='<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="csp-nonce" content="__CSP_NONCE__"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Seu workspace de desenvolvimento com IA: projetos, conversas, código e prévia."><title>Dev Studio — Seu workspace de desenvolvimento</title><link rel="icon" type="image/png" href="/assets/dev-studio-mark.png"><link rel="stylesheet" href="/assets/style.css"><script defer src="/assets/app.js"></script></head><body><div id="root"></div></body></html>';
+const assets={'/':{type:'text/html; charset=utf-8',content:html},'/assets/app.js':{type:'text/javascript; charset=utf-8',content:await readFile('.build/app.js','utf8')},'/assets/style.css':{type:'text/css; charset=utf-8',content:await readFile('client/style.css','utf8')}};
+assets['/assets/dev-studio-mark.png']={type:'image/png',encoding:'base64',content:(await readFile('client/assets/dev-studio-mark.png')).toString('base64')};
+await writeFile('.build/assets.js','export const ASSETS='+JSON.stringify(assets)+';\n');
+await rm('dist',{recursive:true,force:true});await mkdir('dist/server',{recursive:true});
+await build({entryPoints:['worker/server.js'],bundle:true,minify:true,format:'esm',platform:'browser',target:'es2022',outfile:'dist/server/index.js'});
+await cp('drizzle','dist/drizzle',{recursive:true});
+console.log('Frontend e aplicação construídos para o servidor Node do Render.');

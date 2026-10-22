@@ -1,0 +1,13 @@
+export class AppError extends Error{constructor(status,message){super(message);this.status=status;}}
+export function requireText(value,name,max=200,min=1){if(typeof value!=='string'||value.trim().length<min||value.length>max)throw new AppError(422,`${name}: informe entre ${min} e ${max} caracteres.`);return value.trim();}
+export function filePath(value){
+  if(typeof value==='string'&&value.split('/').some(p=>/^(?:\.env(?:\.(?!example$|sample$).*)?|\.dev\.vars.*|\.git|\.ssh|\.aws)$/i.test(p)||/\.(?:pem|p12|pfx|key)$/i.test(p)))throw new AppError(422,'Arquivos de credenciais e segredos não podem ser publicados no projeto. Use a aba APIs.');
+  if(typeof value!=='string'||value.length>160||!value||value.startsWith('/')||value.includes('\\')||value.split('/').some(v=>!v||v==='.'||v==='..')||!/^[-\w./]+$/.test(value))throw new AppError(422,'Caminho de arquivo inválido.');
+  return value;
+}
+export function validateFiles(items){
+  if(!Array.isArray(items)||items.length>30)throw new AppError(422,'A geração excedeu o limite de 30 arquivos.');
+  const seen=new Set();let size=0;
+  return items.map(item=>{const path=filePath(item.path);if(seen.has(path)||typeof item.content!=='string'||item.content.length>120000)throw new AppError(422,'Arquivo inválido ou duplicado na resposta.');seen.add(path);size+=item.content.length;if(size>300000)throw new AppError(422,'A geração excedeu o limite de tamanho.');return{path,content:item.content};});
+}
+export const STARTER=[{path:'index.html',content:'<!doctype html>\n<html lang="pt-BR">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width,initial-scale=1">\n  <title>Meu projeto</title>\n  <link rel="stylesheet" href="style.css">\n</head>\n<body>\n  <main><span class="badge">MEU NOVO PROJETO</span><h1>Sua ideia começa aqui.</h1><p>Descreva o que quer construir no chat ao lado.<br>O assistente criará os arquivos e atualizará esta prévia.</p><button id="hello">Vamos criar →</button></main>\n  <script src="script.js"></script>\n</body>\n</html>'},{path:'style.css',content:'*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f7f9f5;color:#203024;font-family:system-ui,sans-serif}main{padding:48px;max-width:700px}.badge{font-size:11px;letter-spacing:2px;color:#637b50}h1{font-size:clamp(36px,6vw,64px);font-weight:550;letter-spacing:-2px;line-height:1.05;margin:24px 0}p{font-size:16px;line-height:1.9;color:#6d786f}button{background:#b8e68d;border:0;padding:15px 24px;border-radius:8px;font:inherit;cursor:pointer;margin-top:15px}'},{path:'script.js',content:'document.getElementById("hello").addEventListener("click",()=>{document.querySelector("h1").textContent="Vamos dar vida à sua ideia.";});'}];
