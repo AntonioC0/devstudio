@@ -24,9 +24,9 @@ export function useProjectExecution({project,files,call,config,refreshKey}){
     catch(error){setRunError(error.message);}finally{setRunning(false);}
   }
   useEffect(()=>{if(id&&configured&&compiled?.kind==='react'&&compiled.projectId===id&&compiled.version===version)run();},[id,version,compiled,configured]);
-  const ready=runtime?.projectId===id&&runtime.source_version===version&&successful(runtime);
+  const ready=!!(id&&runtime&&runtime.projectId===id&&runtime.source_version===version&&successful(runtime));
   const apiRequest=useCallback(async input=>{const data=await call(`/api/projects/${id}/runtime-request`,{method:'POST',body:JSON.stringify({version,request:input})});setRuntime({status:'live',source_version:version,projectId:id});return data.response;},[id,version,call]);
-  const document=useMemo(()=>previewDocument(files,compiled?.projectId===id&&compiled.version===version?compiled:null),[files,compiled,id,version]);
+  const document=useMemo(()=>previewDocument(files,compiled&&id&&compiled.projectId===id&&compiled.version===version?compiled:null),[files,compiled,id,version]);
   return{document,compiled,compiling,compileError,runtime,ready,apiRequest,running,runError,run,configured};
 }
 export function ExecutionStatus({execution,disabled}){
